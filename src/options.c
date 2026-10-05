@@ -166,6 +166,13 @@ void precalc_rgb(const float red, const float green, const float blue) {
 	}
 }
 
+// Return the value part of a "--key=value" argument, or NULL if arg does
+// not begin with key.
+static const char* opt_value(const char* arg, const char* key) {
+	size_t keylen = strlen(key);
+	return strncmp(arg, key, keylen) == 0 ? arg + keylen : NULL;
+}
+
 void parse_options(int argc, char** argv) {
 	// make code more readable
 	#define IF_OPTS(sopt, lopt)     if ( !strcmp(s, sopt) || !strcmp(s, lopt) )
@@ -177,6 +184,7 @@ void parse_options(int argc, char** argv) {
 
 	for ( n=1, files=0; n<argc; ++n ) {
 		const char *s = argv[n];
+		const char *val;
 
 		if ( *s != '-' ) { // count files to read
 			++files; continue;
@@ -220,19 +228,26 @@ void parse_options(int argc, char** argv) {
 		IF_OPTS("-f", "--term-fit")         { termfit = TERM_FIT_AUTO; continue; }
 #endif
 
-		if ( !strncmp(s, "--output=", 9) ) {
-			fileout = s+9;
+		if ( (val = opt_value(s, "--output=")) ) {
+			fileout = val;
 			continue;
 		}
 
-		if ( !strncmp(s, "--html-title=", 13) ) {
-			html_title = s + 13;
+		if ( (val = opt_value(s, "--html-title=")) ) {
+			html_title = val;
 			continue;
 		}
 
-		if ( !strncmp(s, "--chars=", 8) ) {
+		if ( (val = opt_value(s, "--chars=")) ) {
 
-			if ( strlen(s-8) > ASCII_PALETTE_SIZE ) {
+			// Copy into a local, bounded buffer first so the length
+			// check below can't read past the argument the way the old
+			// strlen(s-8) could, then reject palettes that don't fit.
+			char requested[ASCII_PALETTE_SIZE + 1];
+			strncpy(requested, val, sizeof(requested) - 1);
+			requested[sizeof(requested) - 1] = '\0';
+
+			if ( strlen(requested) > ASCII_PALETTE_SIZE ) {
 				fprintf(stderr,
 					"Too many ascii characters specified (max %d)\n",
 					ASCII_PALETTE_SIZE);
@@ -240,7 +255,7 @@ void parse_options(int argc, char** argv) {
 			}
 	
 			// don't use sscanf, we need to read spaces as well
-			strcpy(ascii_palette, s+8);
+			strcpy(ascii_palette, val);
 			continue;
 		}
 
